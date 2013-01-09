@@ -17,25 +17,31 @@ func main() {
 	baseDir, err := os.Getwd()
 	quitIfErr(err)
 
-	if !RunTestsRecursively(baseDir) {
-		fmt.Printf("\n\n!!! At least one test failed or couldn't be executed\n")
+	failedDirs := RunTestsRecursively(baseDir)
+	fmt.Printf("\n\n")
+	if len(failedDirs) > 0 {
+		print("at least one test failed or couldn't be executed. Failed directories:")
+		for _, dir := range failedDirs {
+			print("  %s", dir)
+		}
+	} else {
+		print("all tests passed.\n")
 	}
 }
 
-func RunTestsRecursively(dirName string) bool {
+func RunTestsRecursively(dirName string) []string {
 	infos, err := ioutil.ReadDir(dirName)
 	quitIfErr(err)
 
-	anyFailures := false
+	failures := []string{}
 
 	anyTestsInDir := false
 	for _, info := range infos {
 		if info.IsDir() {
 			// Recursively run the tests in each subdirectory
 			subDirName := path.Join(dirName, info.Name())
-			if !RunTestsRecursively(subDirName) {
-				anyFailures = true
-			}
+			failedSubDirs := RunTestsRecursively(subDirName)
+			failures = append(failures, failedSubDirs...)
 		} else if IsTestFile(info) {
 			anyTestsInDir = true
 		}
@@ -48,11 +54,11 @@ func RunTestsRecursively(dirName string) bool {
 		bytes, err := exec.Command("go", "test").Output()
 		os.Stdout.Write(bytes)
 		if err != nil {
-			anyFailures = true
+			failures = append(failures, dirName)
 		}
 	}
 
-	return !anyFailures
+	return failures
 }
 
 func IsTestFile(stat os.FileInfo) bool {
@@ -72,4 +78,8 @@ func quitIfErr(err error) {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
 		os.Exit(1)
 	}
+}
+
+func print(fmtStr string, args ...interface{}) {
+	fmt.Printf("alltest: "+fmtStr+"\n", args...)
 }
