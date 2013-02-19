@@ -54,6 +54,7 @@ func RunTestsRecursively(dirName string, skipDirs []os.FileInfo) []string {
 	quitIfErr(err)
 	for _, skipDir := range skipDirs {
 		if os.SameFile(stat, skipDir) {
+			print("skipping directory %s as requested", dirName)
 			return []string{}
 		}
 	}
