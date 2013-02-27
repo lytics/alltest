@@ -43,8 +43,10 @@ func main() {
 		for _, dir := range failedDirs {
 			print("  %s", dir)
 		}
+		os.Exit(1)
 	} else {
 		print("all tests passed.\n")
+		os.Exit(0)
 	}
 }
 
