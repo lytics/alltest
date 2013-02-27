@@ -29,7 +29,7 @@ func main() {
 		}
 		stat, err := os.Stat(skipDirName)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Couldn't stat directory to skip %s: %s", skipDirName,
+			fmt.Fprintf(os.Stderr, "Couldn't stat directory to skip %s: %s\n", skipDirName,
 				err.Error())
 			os.Exit(1)
 		}
