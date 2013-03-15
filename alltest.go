@@ -41,7 +41,7 @@ func main() {
 	failedDirs := RunTestsRecursively(baseDir, conf)
 	fmt.Printf("\n\n")
 	if len(failedDirs) > 0 {
-		print("at least one test failed or couldn't be executed. Failed directories:")
+		print("at least one test or build failed. Failed directories:")
 		for _, dir := range failedDirs {
 			print("  %s", dir)
 		}
