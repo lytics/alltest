@@ -47,7 +47,7 @@ func main() {
 		}
 		os.Exit(1)
 	} else {
-		print("all tests passed.\n")
+		print("all tests/builds succeeded\n")
 		os.Exit(0)
 	}
 }
