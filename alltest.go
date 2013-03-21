@@ -18,7 +18,7 @@ func main() {
 	baseDir, err := os.Getwd()
 	quitIfErr(err)
 
-	skipDirFlag := flag.String("skip", "", "Comma-separated list of directories to skip")
+	skipDirFlag := flag.String("skip", "trash", "Comma-separated list of directories to skip")
 	buildOnlyFlag := flag.Bool("buildOnly", false, "Do \"go build\" instead of \"go test\"")
 	flag.Parse()
 
@@ -32,7 +32,6 @@ func main() {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Couldn't stat directory to skip %s: %s\n", skipDirName,
 				err.Error())
-			os.Exit(1)
 		}
 		skipDirStats = append(skipDirStats, stat)
 	}
