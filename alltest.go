@@ -18,7 +18,7 @@ func main() {
 	baseDir, err := os.Getwd()
 	quitIfErr(err)
 
-	skipDirFlag := flag.String("skip", "", "Comma-separated list of directories to skip")
+	skipDirFlag := flag.String("skip", "trash", "Comma-separated list of directories to skip")
 	buildOnlyFlag := flag.Bool("buildOnly", false, "Do \"go build\" instead of \"go test\"")
 	flag.Parse()
 
