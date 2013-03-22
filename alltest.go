@@ -7,7 +7,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/araddon/gou"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -21,6 +23,8 @@ func main() {
 	skipDirFlag := flag.String("skip", "trash", "Comma-separated list of directories to skip")
 	buildOnlyFlag := flag.Bool("buildOnly", false, "Do \"go build\" instead of \"go test\"")
 	flag.Parse()
+
+	gou.SetLogger(log.New(os.Stdout, "", log.LstdFlags), "debug")
 
 	skipDirNames := strings.Split(*skipDirFlag, ",")
 	skipDirStats := make([]os.FileInfo, 0)
@@ -40,9 +44,9 @@ func main() {
 	failedDirs := RunTestsRecursively(baseDir, conf)
 	fmt.Printf("\n\n")
 	if len(failedDirs) > 0 {
-		print("at least one test or build failed. Failed directories:")
+		gou.Log(gou.ERROR, "at least one test or build failed. Failed directories:")
 		for _, dir := range failedDirs {
-			print("  %s", dir)
+			gou.Logf(gou.ERROR, "  %s", dir)
 		}
 		os.Exit(1)
 	} else {
@@ -52,6 +56,10 @@ func main() {
 }
 
 func RunTestsRecursively(dirName string, conf *Conf) []string {
+
+	if strings.Contains(dirName, "trash") {
+		return nil
+	}
 	// Skip this directory if the user requested that we skip it
 	stat, err := os.Stat(dirName)
 	quitIfErr(err)
@@ -90,6 +98,7 @@ func RunTestsRecursively(dirName string, conf *Conf) []string {
 		bytes, err := exec.Command("go", "test").Output()
 		os.Stdout.Write(bytes)
 		if err != nil {
+			gou.Logf(gou.ERROR, "Failed:  %s", dirName)
 			failures = append(failures, dirName)
 		}
 	} else if anyGoSrcsInDir {
