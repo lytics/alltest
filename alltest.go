@@ -33,9 +33,11 @@ func main() {
 			continue
 		}
 		stat, err := os.Stat(skipDirName)
+		if skipDirName == "trash" && err != nil {
+			continue
+		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Couldn't stat directory to skip %s: %s\n", skipDirName,
-				err.Error())
+			fmt.Fprintf(os.Stderr, "Couldn't stat directory to skip %s: %s\n", skipDirName, err.Error())
 		}
 		skipDirStats = append(skipDirStats, stat)
 	}
