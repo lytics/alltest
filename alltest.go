@@ -71,6 +71,13 @@ func RunTestsRecursively(dirName string, conf *Conf) []string {
 			return []string{}
 		}
 	}
+	// Skip this directory if the user entered a .alltestignore file
+	_, err = os.Stat(path.Join(dirName, ".alltestignore"))
+	if err == nil {
+		// If err == nil that means we found a file, thus should bail
+		print("skipping directory %s as requested due to ignore file", dirName)
+		return []string{}
+	}
 
 	infos, err := ioutil.ReadDir(dirName)
 	quitIfErr(err)
