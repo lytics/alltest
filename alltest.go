@@ -7,13 +7,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/araddon/gou"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
+
+	"github.com/araddon/gou"
 )
 
 func main() {
@@ -22,6 +23,7 @@ func main() {
 
 	skipDirFlag := flag.String("skip", "trash", "Comma-separated list of directories to skip")
 	buildOnlyFlag := flag.Bool("buildOnly", false, "Do \"go build\" instead of \"go test\"")
+	shortFlag := flag.Bool("short", false, `Run "go test" with "short" flag`)
 	flag.Parse()
 
 	gou.SetLogger(log.New(os.Stdout, "", log.LstdFlags), "debug")
@@ -42,7 +44,7 @@ func main() {
 		skipDirStats = append(skipDirStats, stat)
 	}
 
-	conf := NewConf(skipDirStats, *buildOnlyFlag)
+	conf := NewConf(skipDirStats, *buildOnlyFlag, *shortFlag)
 	failedDirs := RunTestsRecursively(baseDir, conf)
 	fmt.Printf("\n\n")
 	if len(failedDirs) > 0 {
@@ -101,10 +103,14 @@ func RunTestsRecursively(dirName string, conf *Conf) []string {
 
 	// Run "go test" in this directory if it has any tests
 	if anyTestsInDir && !conf.buildOnly {
+		testOpts := []string{"test"}
+		if conf.short {
+			testOpts = append(testOpts, "-short")
+		}
 		err = os.Chdir(dirName)
 		quitIfErr(err)
 		print("Running tests in %s", dirName)
-		bytes, err := exec.Command("go", "test").Output()
+		bytes, err := exec.Command("go", testOpts...).Output()
 		os.Stdout.Write(bytes)
 		if err != nil {
 			gou.Logf(gou.ERROR, "Failed:  %s", dirName)
@@ -127,12 +133,14 @@ func RunTestsRecursively(dirName string, conf *Conf) []string {
 type Conf struct {
 	skipDirs  []os.FileInfo
 	buildOnly bool
+	short     bool
 }
 
-func NewConf(skipDirs []os.FileInfo, buildOnly bool) *Conf {
+func NewConf(skipDirs []os.FileInfo, buildOnly, short bool) *Conf {
 	return &Conf{
 		skipDirs:  skipDirs,
 		buildOnly: buildOnly,
+		short:     short,
 	}
 }
 
