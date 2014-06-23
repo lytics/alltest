@@ -54,21 +54,20 @@ func main() {
 	}
 
 	conf := NewConf(skipDirStats, *buildOnlyFlag, *shortFlag)
-	RunTestsRecursively(baseDir, conf)
-	// fmt.Printf("\n\n")
-	// if len(failedDirs) > 0 {
-	// 	gou.Log(gou.ERROR, "at least one test or build failed. Failed directories:")
-	// 	for _, dir := range failedDirs {
-	// 		gou.Logf(gou.ERROR, "  %s", dir)
-	// 	}
-	// 	os.Exit(1)
-	// } else {
-	// 	print("all tests/builds succeeded\n")
-	// 	os.Exit(0)
-	// }
+	failedDirs := RunTestsRecursively(baseDir, baseDir, conf)
+
+	if len(failedDirs) > 0 {
+		gou.Error("\nFailed directories:")
+		for _, dir := range failedDirs {
+			gou.Errorf("  %s", dir)
+		}
+		os.Exit(1)
+	} else {
+		gou.Info("\nall tests/builds succeeded")
+	}
 }
 
-func RunTestsRecursively(dirName string, conf *Conf) []string {
+func RunTestsRecursively(rootDir, dirName string, conf *Conf) []string {
 
 	if strings.Contains(dirName, "trash") {
 		return nil
@@ -101,7 +100,7 @@ func RunTestsRecursively(dirName string, conf *Conf) []string {
 		if info.IsDir() {
 			// Recursively run the tests in each subdirectory
 			subDirName := path.Join(dirName, info.Name())
-			failedSubDirs := RunTestsRecursively(subDirName, conf)
+			failedSubDirs := RunTestsRecursively(rootDir, subDirName, conf)
 			failures = append(failures, failedSubDirs...)
 		} else if isTestFile(info) {
 			anyTestsInDir = true
@@ -110,50 +109,40 @@ func RunTestsRecursively(dirName string, conf *Conf) []string {
 		}
 	}
 
+	goRunOpts := []string{"test"}
+
 	// Run "go test" in this directory if it has any tests
 	if anyTestsInDir && !conf.buildOnly {
-		testOpts := []string{"test"}
 		if conf.short {
-			testOpts = append(testOpts, "-short")
-		}
-		err = os.Chdir(dirName)
-		quitIfErr(err)
-
-		bytes, err := exec.Command("go", testOpts...).Output()
-		if len(bytes) > 0 {
-			// lets get rid of last new line at end of this
-			bytes = bytes[0 : len(bytes)-2]
-		}
-		if err != nil {
-			gou.Errorf(string(bytes))
-			gou.Errorf("Failed:  %s", dirName)
-			failures = append(failures, dirName)
-		} else {
-			if verbose {
-				gou.Debug(string(bytes))
-			}
-			gou.Debugf("Success %s", dirName)
+			goRunOpts = append(goRunOpts, "-short")
 		}
 	} else if anyGoSrcsInDir {
-		err = os.Chdir(dirName)
-		quitIfErr(err)
-		bytes, err := exec.Command("go", "build").Output()
-		if len(bytes) > 0 {
-			// lets get rid of last new line at end of this
-			bytes = bytes[0 : len(bytes)-2]
-		}
-		if err != nil {
-			gou.Errorf(string(bytes))
-			gou.Errorf("Failed:  %s", dirName)
-			failures = append(failures, dirName)
-		} else {
-			if verbose {
-				gou.Debug(string(bytes))
-			}
-			gou.Infof("Success %s", dirName)
-		}
+		goRunOpts = []string{"build"}
+	} else {
+		return failures
+	}
+	err = os.Chdir(dirName)
+	quitIfErr(err)
+	bytes, err := exec.Command("go", goRunOpts...).Output()
+	if len(bytes) > 0 && bytes[len(bytes)-1] == '\n' {
+		// lets get rid of last new line at end of this
+		bytes = bytes[0 : len(bytes)-2]
 	}
 
+	thisDirPath := strings.Replace(dirName, rootDir, "", -1)
+	if err != nil {
+		if len(bytes) > 0 {
+			gou.Errorf(string(bytes))
+		}
+		gou.Errorf("Failed:   %s", thisDirPath)
+		failures = append(failures, thisDirPath)
+	} else {
+		if verbose && len(bytes) > 0 {
+			gou.Debug(string(bytes))
+			gou.Infof("Success   %s", thisDirPath)
+		}
+
+	}
 	return failures
 }
 
