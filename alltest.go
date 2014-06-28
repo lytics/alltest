@@ -6,7 +6,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -17,6 +16,11 @@ import (
 	"github.com/araddon/gou"
 )
 
+var (
+	verbose  bool
+	colorize bool
+)
+
 func main() {
 	baseDir, err := os.Getwd()
 	quitIfErr(err)
@@ -24,10 +28,15 @@ func main() {
 	skipDirFlag := flag.String("skip", "trash", "Comma-separated list of directories to skip")
 	buildOnlyFlag := flag.Bool("buildOnly", false, "Do \"go build\" instead of \"go test\"")
 	shortFlag := flag.Bool("short", false, `Run "go test" with "short" flag`)
+	flag.BoolVar(&colorize, "c", true, `colorize output`)
+	flag.BoolVar(&verbose, "v", false, `verbose output`)
 	raceFlag := flag.Bool("race", false, `Run "go test" with "race" flag`)
 	flag.Parse()
 
-	gou.SetLogger(log.New(os.Stdout, "", log.LstdFlags), "debug")
+	gou.SetLogger(log.New(os.Stderr, "", 0), "debug")
+	if colorize {
+		gou.SetColorIfTerminal()
+	}
 
 	skipDirNames := strings.Split(*skipDirFlag, ",")
 	skipDirStats := make([]os.FileInfo, 0)
@@ -40,27 +49,26 @@ func main() {
 			continue
 		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Couldn't stat directory to skip %s: %s\n", skipDirName, err.Error())
+			gou.Errorf("Couldn't stat directory to skip %s: %s\n", skipDirName, err)
 		}
 		skipDirStats = append(skipDirStats, stat)
 	}
 
 	conf := NewConf(skipDirStats, *buildOnlyFlag, *shortFlag, *raceFlag)
 	failedDirs := RunTestsRecursively(baseDir, conf)
-	fmt.Printf("\n\n")
+
 	if len(failedDirs) > 0 {
-		gou.Log(gou.ERROR, "at least one test or build failed. Failed directories:")
+		gou.Error("\nFailed directories:")
 		for _, dir := range failedDirs {
-			gou.Logf(gou.ERROR, "  %s", dir)
+			gou.Errorf("  %s", dir)
 		}
 		os.Exit(1)
 	} else {
-		print("all tests/builds succeeded\n")
-		os.Exit(0)
+		gou.Info("\nall tests/builds succeeded")
 	}
 }
 
-func RunTestsRecursively(dirName string, conf *Conf) []string {
+func RunTestsRecursively(rootDir, dirName string, conf *Conf) []string {
 
 	if strings.Contains(dirName, "trash") {
 		return nil
@@ -70,7 +78,7 @@ func RunTestsRecursively(dirName string, conf *Conf) []string {
 	quitIfErr(err)
 	for _, skipDir := range conf.skipDirs {
 		if os.SameFile(stat, skipDir) {
-			print("skipping directory %s as requested", dirName)
+			gou.Debugf("skipping directory %s as requested", dirName)
 			return []string{}
 		}
 	}
@@ -78,7 +86,7 @@ func RunTestsRecursively(dirName string, conf *Conf) []string {
 	_, err = os.Stat(path.Join(dirName, ".alltestignore"))
 	if err == nil {
 		// If err == nil that means we found a file, thus should bail
-		print("skipping directory %s as requested due to ignore file", dirName)
+		gou.Debugf("skipping directory %s as requested due to ignore file", dirName)
 		return []string{}
 	}
 
@@ -93,7 +101,7 @@ func RunTestsRecursively(dirName string, conf *Conf) []string {
 		if info.IsDir() {
 			// Recursively run the tests in each subdirectory
 			subDirName := path.Join(dirName, info.Name())
-			failedSubDirs := RunTestsRecursively(subDirName, conf)
+			failedSubDirs := RunTestsRecursively(rootDir, subDirName, conf)
 			failures = append(failures, failedSubDirs...)
 		} else if isTestFile(info) {
 			anyTestsInDir = true
@@ -102,35 +110,43 @@ func RunTestsRecursively(dirName string, conf *Conf) []string {
 		}
 	}
 
+	goRunOpts := []string{"test"}
+
 	// Run "go test" in this directory if it has any tests
 	if anyTestsInDir && !conf.buildOnly {
-		testOpts := []string{"test"}
 		if conf.short {
-			testOpts = append(testOpts, "-short")
+			goRunOpts = append(goRunOpts, "-short")
 		}
 		if conf.race {
-			testOpts = append(testOpts, "-race")
-		}
-		err = os.Chdir(dirName)
-		quitIfErr(err)
-		print("Running tests in %s", dirName)
-		bytes, err := exec.Command("go", testOpts...).Output()
-		os.Stdout.Write(bytes)
-		if err != nil {
-			gou.Logf(gou.ERROR, "Failed:  %s", dirName)
-			failures = append(failures, dirName)
+			goRunOpts = append(goRunOpts, "-race")
 		}
 	} else if anyGoSrcsInDir {
-		err = os.Chdir(dirName)
-		quitIfErr(err)
-		print("Building in %s", dirName)
-		bytes, err := exec.Command("go", "build").Output()
-		os.Stdout.Write(bytes)
-		if err != nil {
-			failures = append(failures, dirName)
-		}
+		goRunOpts = []string{"build"}
+	} else {
+		return failures
+	}
+	err = os.Chdir(dirName)
+	quitIfErr(err)
+	bytes, err := exec.Command("go", goRunOpts...).Output()
+	if len(bytes) > 0 && bytes[len(bytes)-1] == '\n' {
+		// lets get rid of last new line at end of this
+		bytes = bytes[0 : len(bytes)-2]
 	}
 
+	thisDirPath := strings.Replace(dirName, rootDir, "", -1)
+	if err != nil {
+		if len(bytes) > 0 {
+			gou.Errorf(string(bytes))
+		}
+		gou.Errorf("Failed:   %s", thisDirPath)
+		failures = append(failures, thisDirPath)
+	} else {
+		if verbose && len(bytes) > 0 {
+			gou.Debug(string(bytes))
+			gou.Infof("Success   %s", thisDirPath)
+		}
+
+	}
 	return failures
 }
 
@@ -167,11 +183,7 @@ func isGoFile(stat os.FileInfo) bool {
 
 func quitIfErr(err error) {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
+		gou.Errorf("Error: %s", err)
 		os.Exit(1)
 	}
-}
-
-func print(fmtStr string, args ...interface{}) {
-	fmt.Printf("alltest: "+fmtStr+"\n", args...)
 }
