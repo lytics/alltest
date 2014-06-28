@@ -30,6 +30,7 @@ func main() {
 	shortFlag := flag.Bool("short", false, `Run "go test" with "short" flag`)
 	flag.BoolVar(&colorize, "c", true, `colorize output`)
 	flag.BoolVar(&verbose, "v", false, `verbose output`)
+	raceFlag := flag.Bool("race", false, `Run "go test" with "race" flag`)
 	flag.Parse()
 
 	gou.SetLogger(log.New(os.Stderr, "", 0), "debug")
@@ -53,8 +54,8 @@ func main() {
 		skipDirStats = append(skipDirStats, stat)
 	}
 
-	conf := NewConf(skipDirStats, *buildOnlyFlag, *shortFlag)
-	failedDirs := RunTestsRecursively(baseDir, baseDir, conf)
+	conf := NewConf(skipDirStats, *buildOnlyFlag, *shortFlag, *raceFlag)
+	failedDirs := RunTestsRecursively(baseDir, conf)
 
 	if len(failedDirs) > 0 {
 		gou.Error("\nFailed directories:")
@@ -116,6 +117,9 @@ func RunTestsRecursively(rootDir, dirName string, conf *Conf) []string {
 		if conf.short {
 			goRunOpts = append(goRunOpts, "-short")
 		}
+		if conf.race {
+			goRunOpts = append(goRunOpts, "-race")
+		}
 	} else if anyGoSrcsInDir {
 		goRunOpts = []string{"build"}
 	} else {
@@ -150,13 +154,15 @@ type Conf struct {
 	skipDirs  []os.FileInfo
 	buildOnly bool
 	short     bool
+	race      bool
 }
 
-func NewConf(skipDirs []os.FileInfo, buildOnly, short bool) *Conf {
+func NewConf(skipDirs []os.FileInfo, buildOnly, short, race bool) *Conf {
 	return &Conf{
 		skipDirs:  skipDirs,
 		buildOnly: buildOnly,
 		short:     short,
+		race:      race,
 	}
 }
 
