@@ -55,7 +55,7 @@ func main() {
 	}
 
 	conf := NewConf(skipDirStats, *buildOnlyFlag, *shortFlag, *raceFlag)
-	failedDirs := RunTestsRecursively(baseDir, conf)
+	failedDirs := RunTestsRecursively(baseDir, baseDir, conf)
 
 	if len(failedDirs) > 0 {
 		gou.Error("\nFailed directories:")
