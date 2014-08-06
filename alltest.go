@@ -16,11 +16,6 @@ import (
 	"github.com/araddon/gou"
 )
 
-var (
-	verbose  bool
-	colorize bool
-)
-
 func main() {
 	baseDir, err := os.Getwd()
 	quitIfErr(err)
@@ -28,13 +23,13 @@ func main() {
 	skipDirFlag := flag.String("skip", "trash", "Comma-separated list of directories to skip")
 	buildOnlyFlag := flag.Bool("buildOnly", false, "Do \"go build\" instead of \"go test\"")
 	shortFlag := flag.Bool("short", false, `Run "go test" with "short" flag`)
-	flag.BoolVar(&colorize, "c", true, `colorize output`)
-	flag.BoolVar(&verbose, "v", false, `verbose output`)
+	colorFlag := flag.Bool("c", true, "Use colorized log output, colored by severity")
+	verboseFlag := flag.Bool("v", false, `Run "go test" with -v, also be more verbose elsewhere`)
 	raceFlag := flag.Bool("race", false, `Run "go test" with "race" flag`)
 	flag.Parse()
 
 	gou.SetLogger(log.New(os.Stderr, "", 0), "debug")
-	if colorize {
+	if *colorFlag {
 		gou.SetColorIfTerminal()
 	}
 
@@ -54,7 +49,7 @@ func main() {
 		skipDirStats = append(skipDirStats, stat)
 	}
 
-	conf := NewConf(skipDirStats, *buildOnlyFlag, *shortFlag, *raceFlag)
+	conf := NewConf(skipDirStats, *buildOnlyFlag, *shortFlag, *raceFlag, *verboseFlag)
 	failedDirs := RunTestsRecursively(baseDir, baseDir, conf)
 
 	if len(failedDirs) > 0 {
@@ -120,6 +115,9 @@ func RunTestsRecursively(rootDir, dirName string, conf *Conf) []string {
 		if conf.race {
 			goRunOpts = append(goRunOpts, "-race")
 		}
+		if conf.verbose {
+			goRunOpts = append(goRunOpts, "-v")
+		}
 	} else if anyGoSrcsInDir {
 		goRunOpts = []string{"build"}
 	} else {
@@ -127,10 +125,10 @@ func RunTestsRecursively(rootDir, dirName string, conf *Conf) []string {
 	}
 	err = os.Chdir(dirName)
 	quitIfErr(err)
-	bytes, err := exec.Command("go", goRunOpts...).Output()
+	bytes, err := exec.Command("go", goRunOpts...).CombinedOutput() // combined means stderr & stdout
 	if len(bytes) > 0 && bytes[len(bytes)-1] == '\n' {
 		// lets get rid of last new line at end of this
-		bytes = bytes[0 : len(bytes)-2]
+		bytes = bytes[0 : len(bytes)-1]
 	}
 
 	thisDirPath := strings.Replace(dirName, rootDir, "", -1)
@@ -138,12 +136,12 @@ func RunTestsRecursively(rootDir, dirName string, conf *Conf) []string {
 		if len(bytes) > 0 {
 			gou.Errorf(string(bytes))
 		}
-		gou.Errorf("Failed:   %s", thisDirPath)
+		gou.Errorf(`Failed in directory: "%s"`, thisDirPath)
 		failures = append(failures, thisDirPath)
 	} else {
-		if verbose && len(bytes) > 0 {
+		if conf.verbose && len(bytes) > 0 {
 			gou.Debug(string(bytes))
-			gou.Infof("Success   %s", thisDirPath)
+			gou.Infof(`Success in directory: "%s"`, thisDirPath)
 		}
 
 	}
@@ -155,14 +153,16 @@ type Conf struct {
 	buildOnly bool
 	short     bool
 	race      bool
+	verbose   bool
 }
 
-func NewConf(skipDirs []os.FileInfo, buildOnly, short, race bool) *Conf {
+func NewConf(skipDirs []os.FileInfo, buildOnly, short, race, verbose bool) *Conf {
 	return &Conf{
 		skipDirs:  skipDirs,
 		buildOnly: buildOnly,
 		short:     short,
 		race:      race,
+		verbose:   verbose,
 	}
 }
 
