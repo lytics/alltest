@@ -125,7 +125,7 @@ func RunTestsRecursively(rootDir, dirName string, conf *Conf) []string {
 	}
 	err = os.Chdir(dirName)
 	quitIfErr(err)
-	if verbose {
+	if conf.verbose {
 		gou.Debugf("test:  %v", dirName)
 	}
 	bytes, err := exec.Command("go", goRunOpts...).CombinedOutput() // combined means stderr & stdout
