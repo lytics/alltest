@@ -127,6 +127,9 @@ func RunTestsRecursively(rootDir, dirName string, conf *Conf) []string {
 	}
 	err = os.Chdir(dirName)
 	quitIfErr(err)
+	if verbose {
+		gou.Debugf("test:  %v", dirName)
+	}
 	bytes, err := exec.Command("go", goRunOpts...).Output()
 	if len(bytes) > 0 && bytes[len(bytes)-1] == '\n' {
 		// lets get rid of last new line at end of this
