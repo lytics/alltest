@@ -25,6 +25,7 @@ func main() {
 	shortFlag := flag.Bool("short", false, `Run "go test" with "short" flag`)
 	colorFlag := flag.Bool("c", true, "Use colorized log output, colored by severity")
 	verboseFlag := flag.Bool("v", false, `Run "go test" with -v, also be more verbose elsewhere`)
+	veryVerbose := flag.Bool("vv", false, `Very Verbose, comine stdout AND stderr to display`)
 	raceFlag := flag.Bool("race", false, `Run "go test" with "race" flag`)
 	flag.Parse()
 
@@ -49,7 +50,7 @@ func main() {
 		skipDirStats = append(skipDirStats, stat)
 	}
 
-	conf := NewConf(skipDirStats, *buildOnlyFlag, *shortFlag, *raceFlag, *verboseFlag)
+	conf := NewConf(skipDirStats, *buildOnlyFlag, *shortFlag, *raceFlag, *verboseFlag, *veryVerbose)
 	failedDirs := RunTestsRecursively(baseDir, baseDir, conf)
 
 	if len(failedDirs) > 0 {
@@ -115,7 +116,7 @@ func RunTestsRecursively(rootDir, dirName string, conf *Conf) []string {
 		if conf.race {
 			goRunOpts = append(goRunOpts, "-race")
 		}
-		if conf.verbose {
+		if conf.veryVerbose {
 			goRunOpts = append(goRunOpts, "-v")
 		}
 	} else if anyGoSrcsInDir {
@@ -125,10 +126,14 @@ func RunTestsRecursively(rootDir, dirName string, conf *Conf) []string {
 	}
 	err = os.Chdir(dirName)
 	quitIfErr(err)
-	if conf.verbose {
-		gou.Debugf("test:  %v", dirName)
+
+	var bytes []byte
+	if conf.veryVerbose {
+		bytes, err = exec.Command("go", goRunOpts...).CombinedOutput() // combined means stderr & stdout
+	} else {
+		bytes, err = exec.Command("go", goRunOpts...).Output()
 	}
-	bytes, err := exec.Command("go", goRunOpts...).CombinedOutput() // combined means stderr & stdout
+
 	if len(bytes) > 0 && bytes[len(bytes)-1] == '\n' {
 		// lets get rid of last new line at end of this
 		bytes = bytes[0 : len(bytes)-1]
@@ -152,20 +157,22 @@ func RunTestsRecursively(rootDir, dirName string, conf *Conf) []string {
 }
 
 type Conf struct {
-	skipDirs  []os.FileInfo
-	buildOnly bool
-	short     bool
-	race      bool
-	verbose   bool
+	skipDirs    []os.FileInfo
+	buildOnly   bool
+	short       bool
+	race        bool
+	verbose     bool
+	veryVerbose bool
 }
 
-func NewConf(skipDirs []os.FileInfo, buildOnly, short, race, verbose bool) *Conf {
+func NewConf(skipDirs []os.FileInfo, buildOnly, short, race, verbose, veryVerbose bool) *Conf {
 	return &Conf{
-		skipDirs:  skipDirs,
-		buildOnly: buildOnly,
-		short:     short,
-		race:      race,
-		verbose:   verbose,
+		skipDirs:    skipDirs,
+		buildOnly:   buildOnly,
+		short:       short,
+		race:        race,
+		verbose:     verbose,
+		veryVerbose: veryVerbose,
 	}
 }
 
