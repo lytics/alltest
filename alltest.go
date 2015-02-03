@@ -149,7 +149,7 @@ func RunTestsRecursively(rootDir, dirName string, conf *Conf) []string {
 	} else {
 		if conf.verbose && len(bytes) > 0 {
 			gou.Debug(string(bytes))
-			gou.Infof(`Success in directory: "%s"`, thisDirPath)
+			//gou.Infof(`Success in directory: "%s"`, thisDirPath)
 		}
 
 	}
