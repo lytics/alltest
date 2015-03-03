@@ -69,6 +69,11 @@ func RunTestsRecursively(rootDir, dirName string, conf *Conf) []string {
 	if strings.Contains(dirName, "trash") {
 		return nil
 	}
+
+	// Standard go tools skip files/dirs prefixed with _
+	if strings.HasPrefix(path.Base(dirName), "_") {
+		return nil
+	}
 	// Skip this directory if the user requested that we skip it
 	stat, err := os.Stat(dirName)
 	quitIfErr(err)
